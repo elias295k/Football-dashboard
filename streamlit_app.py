@@ -108,7 +108,7 @@ if page == "🏠 Home":
     ## 📋 How to Use This Dashboard
     
     1. **📈 Analysis Tab**: View league-wide trends and upset rates by match context
-       - Compare home win percentages in low vs high attendance conditions
+       - Compare home win percentages in low crowd vs high crowd attendance conditions
        - See how crowd effect varies by favorite strength
     
     2. **🔍 Deep Dive Tab**: Team-level analysis with individual controls
@@ -116,7 +116,7 @@ if page == "🏠 Home":
        - Highlight specific teams and see their crowd sensitivity
     
     3. **⚙️ Customize**: Use sidebar filters to adjust:
-       - Attendance thresholds (what counts as "ghost" vs "crowd")
+       - Attendance thresholds (what counts as "low crowd" vs "high crowd")
        - Season range and league selection
        - Minimum game thresholds for reliability
     
@@ -157,21 +157,27 @@ elif page == "📈 Analysis":
 
     st.sidebar.divider()
     st.sidebar.subheader("Crowd classification")
-    fixed_low_analysis = st.sidebar.slider("Ghost threshold (AttendanceRate)", 0.00, 0.60, 0.30, 0.01)
-    fixed_high_analysis = st.sidebar.slider("Crowd threshold (AttendanceRate)", 0.40, 1.00, 0.70, 0.01)
+    fixed_low_analysis = st.sidebar.slider("Low Crowd threshold (AttendanceRate)", 0.00, 0.60, 0.30, 0.01)
+    fixed_high_analysis = st.sidebar.slider("High Crowd threshold (AttendanceRate)", 0.40, 1.00, 0.70, 0.01)
 
     def apply_crowd_status(dfi: pd.DataFrame) -> pd.DataFrame:
         dfo = dfi.copy()
         dfo["CrowdStatus"] = pd.Series(pd.NA, index=dfo.index, dtype="string")
-        dfo.loc[dfo["AttendanceRate"] <= fixed_low_analysis, "CrowdStatus"] = "Ghost"
-        dfo.loc[dfo["AttendanceRate"] >= fixed_high_analysis, "CrowdStatus"] = "Crowd"
+        dfo.loc[dfo["AttendanceRate"] <= fixed_low_analysis, "CrowdStatus"] = "Low Crowd"
+        dfo.loc[dfo["AttendanceRate"] >= fixed_high_analysis, "CrowdStatus"] = "High Crowd"
 
         return dfo[dfo["CrowdStatus"].notna()].copy()
 
     # =========================================================
-    # Dumbbell Plot: Home Win % by League (Ghost vs Crowd)
+    # Dumbbell Plot: Home Win % by League (Low Crowd vs High Crowd)
     # =========================================================
     st.header("Home Win % by League: Low Crowd vs High Crowd")
+    st.markdown("""
+    **How to read this chart:**
+    - Each line connects the same league's performance under Low Crowd (left) vs High Crowd (right)
+    - A shift to the right = stronger home advantage when crowds are present
+    - This visual comparison isolates the crowd effect from team strength
+    """)
 
     col_l, col_r = st.columns([1, 0.001])
 
@@ -179,6 +185,11 @@ elif page == "📈 Analysis":
     dff = apply_crowd_status(df)
 
     if not dff.empty:
+    
+        st.markdown("""
+        Across all leagues, home teams win more often when stadiums are full, with the largest increases observed in D1, F1, and E0.
+        The consistent rightward shift indicates a systematic crowd effect rather than league-specific noise.
+        """)
         # Aggregate: Home win % per league × crowd status
         league_stats = (
             dff.groupby(["Division", "CrowdStatus"], as_index=False)
@@ -187,8 +198,8 @@ elif page == "📈 Analysis":
         )
 
         wide_dumb = league_stats.pivot(index="Division", columns="CrowdStatus", values="HomeWinPct").reset_index()
-        wide_dumb = wide_dumb.dropna(subset=["Ghost", "Crowd"]).copy()
-        wide_dumb["Effect_pp"] = wide_dumb["Crowd"] - wide_dumb["Ghost"]
+        wide_dumb = wide_dumb.dropna(subset=["Low Crowd", "High Crowd"]).copy()
+        wide_dumb["Effect_pp"] = wide_dumb["High Crowd"] - wide_dumb["Low Crowd"]
         wide_dumb = wide_dumb.sort_values("Effect_pp", ascending=False).reset_index(drop=True)
 
         # Build dumbbell plot
@@ -197,7 +208,7 @@ elif page == "📈 Analysis":
         # Connecting lines
         for _, row in wide_dumb.iterrows():
             fig_dumb.add_trace(go.Scatter(
-                x=[row["Ghost"], row["Crowd"]],
+                x=[row["Low Crowd"], row["High Crowd"]],
                 y=[row["Division"], row["Division"]],
                 mode="lines",
                 line=dict(width=6, color="rgba(100,100,100,0.3)"),
@@ -205,33 +216,33 @@ elif page == "📈 Analysis":
                 hoverinfo="skip"
             ))
 
-        # Ghost points
+        # Low Crowd points
         fig_dumb.add_trace(go.Scatter(
-            x=wide_dumb["Ghost"],
+            x=wide_dumb["Low Crowd"],
             y=wide_dumb["Division"],
             mode="markers+text",
-            text=[f"{v:.1f}%" for v in wide_dumb["Ghost"]],
+            text=[f"{v:.1f}%" for v in wide_dumb["Low Crowd"]],
             textposition="middle left",
             marker=dict(size=12, color="steelblue"),
-            name="Ghost (low crowd)",
+            name="Low Crowd",
             customdata=np.stack([wide_dumb["Effect_pp"]], axis=-1),
-            hovertemplate="<b>%{y}</b><br>Ghost: %{x:.1f}%<br>Effect: %{customdata[0]:.1f} pp<extra></extra>"
+            hovertemplate="<b>League: %{y}</b><br>Home Win % (Low Crowd): %{x:.1f}%<br>Crowd Effect: %{customdata[0]:.1f} pp<extra></extra>"
         ))
 
-        # Crowd points
+        # High Crowd points
         fig_dumb.add_trace(go.Scatter(
-            x=wide_dumb["Crowd"],
+            x=wide_dumb["High Crowd"],
             y=wide_dumb["Division"],
             mode="markers+text",
-            text=[f"{v:.1f}%" for v in wide_dumb["Crowd"]],
+            text=[f"{v:.1f}%" for v in wide_dumb["High Crowd"]],
             textposition="middle right",
             marker=dict(size=12, color="coral"),
-            name="Crowd (high crowd)",
+            name="High Crowd",
             customdata=np.stack([wide_dumb["Effect_pp"]], axis=-1),
-            hovertemplate="<b>%{y}</b><br>Crowd: %{x:.1f}%<br>Effect: %{customdata[0]:.1f} pp<extra></extra>"
+            hovertemplate="<b>League: %{y}</b><br>Home Win % (High Crowd): %{x:.1f}%<br>Crowd Effect: %{customdata[0]:.1f} pp<extra></extra>"
         ))
 
-        crowd_label = f"Ghost (≤{fixed_low_analysis:.0%}) vs Crowd (≥{fixed_high_analysis:.0%})"
+        crowd_label = f"Low Crowd (≤{fixed_low_analysis:.0%}) vs High Crowd (≥{fixed_high_analysis:.0%})"
 
         fig_dumb.update_layout(
             title=f"Home Win % by League: {crowd_label} — sorted by effect",
@@ -248,116 +259,9 @@ elif page == "📈 Analysis":
 
         st.divider()
 
-    # =========================================================
-    # Supporting View 2: Upset Rate by Favorite Strength
-    # =========================================================
-    st.header("Upset Rate by Favorite Strength – Ghost vs Crowd")
-
-    # Build favorite / upset definitions
-    tmp = dff.copy()
-    tmp = tmp[tmp["HomeElo"].notna() & tmp["AwayElo"].notna()].copy()
-
-    tmp["EloDiffAbs"] = (tmp["HomeElo"] - tmp["AwayElo"]).abs()
     
-    # Favorite side
-    tmp["FavSide"] = np.where(tmp["HomeElo"] >= tmp["AwayElo"], "Home", "Away")
-    tmp["FavWin"] = ((tmp["FavSide"] == "Home") & (tmp["FTResult"] == "H")) | ((tmp["FavSide"] == "Away") & (tmp["FTResult"] == "A"))
-
-    # Upset: favorite did not win (includes draw as upset)
-    tmp["Upset"] = (~tmp["FavWin"]).astype(int)
-
-    # threshold for being "a favorite game"
-    fav_min = st.slider("Min EloDiffAbs to count as 'favorite game'", 0, 140, 50, 10)
-    tmp = tmp[tmp["EloDiffAbs"] >= fav_min].copy()
-
-    # bins (editable)
-    bins = [fav_min, 150, 300, np.inf]
-    labels = ["Small Fav", "Strong Fav", "Huge Fav"]
-    tmp["FavStrength"] = pd.cut(tmp["EloDiffAbs"], bins=bins, labels=labels, right=False)
-    tmp = tmp[tmp["FavStrength"].notna()].copy()
-
-    if not tmp.empty:
-        stats2 = (
-            tmp.groupby(["FavStrength", "CrowdStatus"], as_index=False)
-               .agg(UpsetRate=("Upset", lambda s: 100.0 * s.mean()),
-                    Matches=("Upset", "size"))
-        )
-
-        wide2 = stats2.pivot(index="FavStrength", columns="CrowdStatus", values="UpsetRate").reset_index()
-        wide2 = wide2.dropna(subset=["Ghost", "Crowd"]).copy()
-        
-        if not wide2.empty:
-            wide2["Effect_pp"] = wide2["Ghost"] - wide2["Crowd"]  # positive = more upsets without crowd
-            wide2 = wide2.set_index("FavStrength").reindex(labels).reset_index()
-            wide2 = wide2.dropna(subset=["Crowd", "Ghost"])
-
-            # Build dumbbell plot for upset rate
-            fig2 = go.Figure()
-
-            for _, r in wide2.iterrows():
-                fig2.add_trace(go.Scatter(
-                    x=[r["Crowd"], r["Ghost"]],
-                    y=[r["FavStrength"], r["FavStrength"]],
-                    mode="lines",
-                    line=dict(width=7, color="rgba(100,100,100,0.3)"),
-                    showlegend=False,
-                    hoverinfo="skip"
-                ))
-
-            fig2.add_trace(go.Scatter(
-                x=wide2["Crowd"],
-                y=wide2["FavStrength"],
-                mode="markers+text",
-                text=[f"{v:.1f}%" for v in wide2["Crowd"]],
-                textposition="top center",
-                marker=dict(size=12, color="steelblue"),
-                name="Crowd",
-                customdata=np.stack([wide2["Effect_pp"]], axis=-1),
-                hovertemplate="<b>%{y}</b><br>Upset Rate (Crowd): %{x:.1f}%<br>Effect: %{customdata[0]:.1f} pp<extra></extra>"
-            ))
-
-            fig2.add_trace(go.Scatter(
-                x=wide2["Ghost"],
-                y=wide2["FavStrength"],
-                mode="markers+text",
-                text=[f"{v:.1f}%" for v in wide2["Ghost"]],
-                textposition="bottom center",
-                marker=dict(size=12, color="coral"),
-                name="Ghost",
-                customdata=np.stack([wide2["Effect_pp"]], axis=-1),
-                hovertemplate="<b>%{y}</b><br>Upset Rate (Ghost): %{x:.1f}%<br>Effect: %{customdata[0]:.1f} pp<extra></extra>"
-            ))
-
-            crowd_label = f"Ghost (≤{fixed_low_analysis:.0%}) vs Crowd (≥{fixed_high_analysis:.0%})"
-
-            fig2.update_layout(
-                height=380,
-                margin=dict(l=60, r=40, t=60, b=40),
-                xaxis_title="Upset Rate (%) — Favorite Did NOT Win",
-                yaxis_title="Favorite Strength (by EloDiff)",
-                title=f"Upset Rate by Favorite Strength: {crowd_label}",
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
-                hovermode="closest"
-            )
-
-            st.plotly_chart(fig2, use_container_width=True)
-
-            with st.expander("Show summary table (Graph 2)"):
-                st.dataframe(
-                    wide2[["FavStrength", "Crowd", "Ghost", "Effect_pp"]]
-                        .rename(columns={"Crowd": "Upset % (Crowd)", "Ghost": "Upset % (Ghost)", "Effect_pp": "Effect (pp)"}),
-                    use_container_width=True,
-                    hide_index=True
-                )
-        else:
-            st.warning("No data available for upset rate analysis after filtering.")
-    else:
-        st.warning("No favorite games after current EloDiff threshold.")
-
-    st.divider()
-
     # =========================================================
-    # A3: Upsets Radar (Ghost vs Crowd)
+    # A3: Upsets Radar (Low Crowd vs High Crowd)
     # =========================================================
     st.markdown(
         """
@@ -385,7 +289,7 @@ elif page == "📈 Analysis":
         </style>
         <div class="radar-wrap">
             <div class="radar-title">The Expanding Web of Upsets</div>
-            <div class="radar-subtitle">Ghost vs Crowd — Upset rate by favorite strength</div>
+            <div class="radar-subtitle">Low Crowd vs High Crowd — Upset rate by favorite strength</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -393,8 +297,8 @@ elif page == "📈 Analysis":
 
     dff_radar = df.copy()
     dff_radar["CrowdStatus"] = pd.Series(pd.NA, index=dff_radar.index, dtype="string")
-    dff_radar.loc[dff_radar["AttendanceRate"] <= fixed_low_analysis, "CrowdStatus"] = "Ghost (Empty)"
-    dff_radar.loc[dff_radar["AttendanceRate"] >= fixed_high_analysis, "CrowdStatus"] = "Crowd (Full)"
+    dff_radar.loc[dff_radar["AttendanceRate"] <= fixed_low_analysis, "CrowdStatus"] = "Low Crowd (Empty)"
+    dff_radar.loc[dff_radar["AttendanceRate"] >= fixed_high_analysis, "CrowdStatus"] = "High Crowd (Full)"
 
     dff_radar = dff_radar[dff_radar["CrowdStatus"].notna()].copy()
     dff_radar = dff_radar[dff_radar["EloDiff"] > 0].copy()
@@ -411,7 +315,7 @@ elif page == "📈 Analysis":
         .unstack()
     )
 
-    for col in ["Crowd (Full)", "Ghost (Empty)"]:
+    for col in ["High Crowd (Full)", "Low Crowd (Empty)"]:
         if col not in stats.columns:
             stats[col] = 0
 
@@ -419,8 +323,8 @@ elif page == "📈 Analysis":
         st.warning("No data available for the selected filters.")
     else:
         categories = stats.index.astype(str).tolist()
-        values_crowd = stats["Crowd (Full)"].fillna(0).tolist()
-        values_ghost = stats["Ghost (Empty)"].fillna(0).tolist()
+        values_crowd = stats["High Crowd (Full)"].fillna(0).tolist()
+        values_ghost = stats["Low Crowd (Empty)"].fillna(0).tolist()
 
         fig_radar = go.Figure()
         fig_radar.add_trace(
@@ -428,7 +332,7 @@ elif page == "📈 Analysis":
                 r=values_crowd,
                 theta=categories,
                 fill="toself",
-                name="Crowd (Full)",
+                name="High Crowd (Full)",
                 line=dict(color="#2ecc71", width=2),
                 fillcolor="rgba(46, 204, 113, 0.25)",
             )
@@ -438,7 +342,7 @@ elif page == "📈 Analysis":
                 r=values_ghost,
                 theta=categories,
                 fill="toself",
-                name="Ghost (Empty)",
+                name="Low Crowd (Empty)",
                 line=dict(color="#e74c3c", width=2),
                 fillcolor="rgba(231, 76, 60, 0.25)",
             )
@@ -467,6 +371,12 @@ elif page == "📈 Analysis":
         st.plotly_chart(fig_radar, use_container_width=True)
 
         st.markdown("""
+        This radar chart compares upset rates across favorite strength levels under full and empty stadium conditions.
+        Across all categories, upset rates are consistently higher when crowds are absent, with the largest gaps appearing for stronger favorites.
+        The expanding shape under low crowd conditions highlights how crowd absence amplifies match unpredictability.
+        """)
+
+        st.markdown("""
         **Interpretation**  
         - Each axis represents favorite strength (EloBin).  
         - Radius shows upset rate (home favorite loses).  
@@ -482,9 +392,9 @@ elif page == "🔍 Deep Dive":
     
     st.info("""
     **What you're looking at:**
-    - Each point = one team's average performance in Ghost vs Crowd conditions
-    - X-axis = Elo difference between crowd and ghost conditions (how much stronger the home team faced in crowds)
-    - Y-axis = **Residual** = actual crowd effect after controlling for opponent strength
+    - Each point = one team's average performance in Low Crowd vs High Crowd conditions
+    - X-axis = Elo difference between crowd and low crowd conditions (how much stronger the home team faced in crowds)
+    - Y-axis = **Crowd effect beyond Elo (pp)** = actual crowd effect after controlling for opponent strength
     - Point size = total games analyzed for that team
     """)
     
@@ -506,8 +416,8 @@ elif page == "🔍 Deep Dive":
 
     st.sidebar.divider()
     st.sidebar.subheader("Crowd classification")
-    fixed_low = st.sidebar.slider("Ghost threshold (AttendanceRate)", 0.00, 0.60, 0.30, 0.01)
-    fixed_high = st.sidebar.slider("Crowd threshold (AttendanceRate)", 0.40, 1.00, 0.70, 0.01)
+    fixed_low = st.sidebar.slider("Low Crowd threshold (AttendanceRate)", 0.00, 0.60, 0.30, 0.01)
+    fixed_high = st.sidebar.slider("High Crowd threshold (AttendanceRate)", 0.40, 1.00, 0.70, 0.01)
 
     min_matches_status = st.sidebar.slider("Min matches per status", 3, 30, 8, 1)
 
@@ -524,7 +434,7 @@ elif page == "🔍 Deep Dive":
             d["AttendanceRate"] >= fixed_high,
         ]
 
-        d["CrowdStatus"] = np.select(conds, ["Ghost", "Crowd"], default="Partial").astype("object")
+        d["CrowdStatus"] = np.select(conds, ["Low Crowd", "High Crowd"], default="Partial").astype("object")
         return d
 
     # =========================================================
@@ -533,7 +443,7 @@ elif page == "🔍 Deep Dive":
     st.header("Team-Level Analysis: Residual Crowd Effect (controlling for Elo)")
 
     d1 = add_crowd_status(df_f)
-    d1 = d1[d1["CrowdStatus"].isin(["Ghost", "Crowd"])].copy()
+    d1 = d1[d1["CrowdStatus"].isin(["Low Crowd", "High Crowd"])].copy()
 
     # aggregate per team×status (HOME only)
     team_stats = (
@@ -558,8 +468,8 @@ elif page == "🔍 Deep Dive":
 
     # require enough games in both statuses
     wide = wide[
-        (wide["Games_Crowd"] >= min_matches_status) &
-        (wide["Games_Ghost"] >= min_matches_status)
+        (wide["Games_High Crowd"] >= min_matches_status) &
+        (wide["Games_Low Crowd"] >= min_matches_status)
     ].copy()
 
     # Ensure no duplicate rows
@@ -568,9 +478,9 @@ elif page == "🔍 Deep Dive":
     if len(wide) < 5:
         st.warning("Not enough teams after filters. Try lowering min matches or expanding season/leagues.")
     else:
-        wide["DeltaWin_pp"] = wide["WinPct_Crowd"] - wide["WinPct_Ghost"]
-        wide["DeltaElo"] = wide["AvgHomeElo_Crowd"] - wide["AvgHomeElo_Ghost"]
-        wide["TotalGames"] = wide["Games_Crowd"] + wide["Games_Ghost"]
+        wide["DeltaWin_pp"] = wide["WinPct_High Crowd"] - wide["WinPct_Low Crowd"]
+        wide["DeltaElo"] = wide["AvgHomeElo_High Crowd"] - wide["AvgHomeElo_Low Crowd"]
+        wide["TotalGames"] = wide["Games_High Crowd"] + wide["Games_Low Crowd"]
 
         # regression: DeltaWin ~ DeltaElo
         X = wide[["DeltaElo"]].values
@@ -584,6 +494,17 @@ elif page == "🔍 Deep Dive":
         c1.metric("Teams included", f"{len(wide)}")
         c2.metric("Slope (pp per Elo)", f"{model.coef_[0]:.3f}")
         c3.metric("Intercept", f"{model.intercept_:.3f}")
+
+        st.markdown("""
+        - **ΔElo (X):** Positive = team was stronger in High Crowd periods; negative = stronger in Low Crowd periods.
+        - **Crowd effect beyond Elo (Y):** Positive = outperformed what Elo predicts when crowds were present; negative = underperformed relative to strength.
+
+        Reading both axes together separates timing/strength shifts from true crowd-driven deviations, surfacing teams that are unusually sensitive—or insensitive—to crowd presence.
+        """)
+
+        # Calculate percentiles for reference lines (D2)
+        p90 = wide["Residual"].quantile(0.90)
+        p10 = wide["Residual"].quantile(0.10)
 
         # team selector
         wide["TeamLabel"] = wide["HomeTeam"] + " (" + wide["Division"] + ")"
@@ -600,7 +521,6 @@ elif page == "🔍 Deep Dive":
             x="DeltaElo",
             y="Residual",
             color="Division",
-            size="TotalGames",
             hover_name="HomeTeam",
             custom_data=["Selected", "TeamLabel"],
             hover_data={
@@ -609,20 +529,35 @@ elif page == "🔍 Deep Dive":
                 "DeltaWin_pp": ":.1f",
                 "Expected_DeltaWin": ":.1f",
                 "Residual": ":.1f",
-                "WinPct_Crowd": ":.1f",
-                "WinPct_Ghost": ":.1f",
-                "AvgHomeElo_Crowd": ":.1f",
-                "AvgHomeElo_Ghost": ":.1f",
-                "Games_Crowd": True,
-                "Games_Ghost": True,
+                "WinPct_High Crowd": ":.1f",
+                "WinPct_Low Crowd": ":.1f",
+                "AvgHomeElo_High Crowd": ":.1f",
+                "AvgHomeElo_Low Crowd": ":.1f",
+                "Games_High Crowd": True,
+                "Games_Low Crowd": True,
                 "Selected": False,
                 "TeamLabel": False,
             },
-            title="Residual Crowd Effect vs ΔElo (teams)"
+            labels={
+                "Division": "League",
+                "DeltaElo": "Elo Difference (High - Low Crowd)",
+                "DeltaWin_pp": "Win % Difference (pp)",
+                "Expected_DeltaWin": "Expected Difference (by Elo)",
+                "Residual": "Crowd Effect Beyond Elo (pp)",
+                "WinPct_High Crowd": "Win % (High Crowd)",
+                "WinPct_Low Crowd": "Win % (Low Crowd)",
+                "AvgHomeElo_High Crowd": "Avg Home Elo (High Crowd)",
+                "AvgHomeElo_Low Crowd": "Avg Home Elo (Low Crowd)",
+                "Games_High Crowd": "Games (High Crowd)",
+                "Games_Low Crowd": "Games (Low Crowd)",
+            },
+            title="Crowd Effect beyond Elo (pp) vs ΔElo (teams)"
         )
+        # uniform bubble size for readability
+        fig.update_traces(marker=dict(size=12))
         fig.add_hline(y=0)
         fig.add_vline(x=0)
-
+        
         # highlight selected - dim non-selected and highlight selected
         if len(selected) > 0:
             # Dim all traces
@@ -636,9 +571,9 @@ elif page == "🔍 Deep Dive":
                 x="DeltaElo",
                 y="Residual",
                 color="Division",
-                size="TotalGames",
                 hover_name="HomeTeam",
             )
+            fig_selected.update_traces(marker=dict(size=12))
             
             # Add all traces from the selected figure (handles multiple divisions)
             for trace in fig_selected.data:
@@ -649,16 +584,27 @@ elif page == "🔍 Deep Dive":
         st.plotly_chart(fig, width="stretch")
 
         with st.expander("Underlying table"):
-            cols = ["Division","HomeTeam","Residual","DeltaWin_pp","DeltaElo","Games_Crowd","Games_Ghost","WinPct_Crowd","WinPct_Ghost"]
-            st.dataframe(wide[cols].sort_values("Residual", ascending=False), width="stretch")
+            cols = ["Division","HomeTeam","Residual","DeltaWin_pp","DeltaElo","Games_High Crowd","Games_Low Crowd","WinPct_High Crowd","WinPct_Low Crowd"]
+            renamed_cols = {
+                "Residual": "Crowd effect beyond Elo (pp)",
+                "DeltaWin_pp": "ΔWin (pp)",
+                "DeltaElo": "ΔElo",
+            }
+            st.dataframe(wide[cols].sort_values("Residual", ascending=False).rename(columns=renamed_cols), width="stretch")
 
         st.divider()
 
         # =========================================================
-        # A2: PPG Ghost vs Crowd (match screenshot)
+        # A2: PPG Low Crowd vs High Crowd (match screenshot)
         # =========================================================
-        st.header("Team Performance: Ghost vs Crowd (Points Per Game)")
-        st.caption("Scatter plot comparing each team's average points per game in Ghost vs Crowd conditions. Points above the diagonal indicate a crowd boost.")
+        st.header("Team Performance: Low Crowd vs High Crowd (Points Per Game)")
+        st.caption("Scatter plot comparing each team's average points per game in Low Crowd vs High Crowd conditions. Points above the diagonal indicate a crowd boost.")
+
+        st.markdown("""
+        Points above the diagonal earned more PPG with fans; points below performed better in low-crowd games.
+        The overall upward trend shows team strength is broadly consistent, while deviations from the diagonal reveal who gains or loses with crowd presence.
+        All points use a uniform bubble size so comparisons stay clear; hover to see the exact gap between Low vs High Crowd PPG.
+        """)
 
         dppg = d1.copy()
         dppg["HomePoints"] = np.select(
@@ -680,35 +626,50 @@ elif page == "🔍 Deep Dive":
         wide_ppg.columns = [f"{a}_{b}" for a, b in wide_ppg.columns]
         wide_ppg = wide_ppg.reset_index(drop=False)
 
-        required_cols = {"PPG_Crowd", "PPG_Ghost", "Games_Crowd", "Games_Ghost"}
+        required_cols = {"PPG_High Crowd", "PPG_Low Crowd", "Games_High Crowd", "Games_Low Crowd"}
         if not required_cols.issubset(set(wide_ppg.columns)):
-            st.warning("Not enough data to build Ghost vs Crowd PPG comparison after filtering.")
+            st.warning("Not enough data to build Low Crowd vs High Crowd PPG comparison after filtering.")
         else:
             wide_ppg = wide_ppg[
-                (wide_ppg["Games_Crowd"] >= min_matches_status) &
-                (wide_ppg["Games_Ghost"] >= min_matches_status)
+                (wide_ppg["Games_High Crowd"] >= min_matches_status) &
+                (wide_ppg["Games_Low Crowd"] >= min_matches_status)
             ].copy()
 
             if wide_ppg.empty:
                 st.warning("Not enough teams after filters. Try lowering min matches or expanding season/leagues.")
             else:
-                max_ppg = float(max(wide_ppg["PPG_Crowd"].max(), wide_ppg["PPG_Ghost"].max(), 3.0))
+                max_ppg = float(max(wide_ppg["PPG_High Crowd"].max(), wide_ppg["PPG_Low Crowd"].max(), 3.0))
+
+                # distance from diagonal for hover context
+                wide_ppg["GapFromDiagonal"] = (wide_ppg["PPG_High Crowd"] - wide_ppg["PPG_Low Crowd"]).abs()
 
                 fig_ppg = px.scatter(
                     wide_ppg,
-                    x="PPG_Crowd",
-                    y="PPG_Ghost",
+                    x="PPG_High Crowd",
+                    y="PPG_Low Crowd",
                     color="Division",
                     hover_name="HomeTeam",
                     hover_data={
                         "Division": True,
-                        "PPG_Crowd": ":.2f",
-                        "PPG_Ghost": ":.2f",
-                        "Games_Crowd": True,
-                        "Games_Ghost": True,
+                        "PPG_High Crowd": ":.2f",
+                        "PPG_Low Crowd": ":.2f",
+                        "Games_High Crowd": True,
+                        "Games_Low Crowd": True,
+                        "GapFromDiagonal": ":.2f",
                     },
-                    title="Team PPG: Crowd vs Ghost Attendance",
+                    labels={
+                        "Division": "League",
+                        "PPG_High Crowd": "Points Per Game (High Crowd)",
+                        "PPG_Low Crowd": "Points Per Game (Low Crowd)",
+                        "Games_High Crowd": "Games (High Crowd)",
+                        "Games_Low Crowd": "Games (Low Crowd)",
+                        "GapFromDiagonal": "Gap From Diagonal",
+                    },
+                    title="Team PPG: High Crowd vs Low Crowd Attendance",
                 )
+
+                # keep uniform bubble size that's easy to read
+                fig_ppg.update_traces(marker=dict(size=10))
 
                 fig_ppg.add_trace(
                     go.Scatter(
@@ -727,14 +688,14 @@ elif page == "🔍 Deep Dive":
                     margin=dict(l=60, r=40, t=80, b=60),
                     legend_title_text="Division",
                     xaxis=dict(
-                        title="PPG (Crowd)",
+                        title="PPG (High Crowd)",
                         range=[0, max_ppg],
                         showgrid=True,
                         gridcolor="rgba(255,255,255,0.12)",
                         zeroline=False,
                     ),
                     yaxis=dict(
-                        title="PPG (Ghost)",
+                        title="PPG (Low Crowd)",
                         range=[0, max_ppg],
                         showgrid=True,
                         gridcolor="rgba(255,255,255,0.12)",
@@ -749,6 +710,22 @@ elif page == "🔍 Deep Dive":
 # =========================================================
 elif page == "⚽ Elo vs Attendance":
     st.title("Elo vs Attendance (Gapminder-style)")
+    st.markdown("""
+    **Bubble size explanation:**
+    - Bubble size encodes each team's average Elo strength (larger = stronger team by Elo rating)
+    - X-axis shows total season points, Y-axis shows average attendance
+    """)
+
+    st.markdown("""
+    This animated bubble chart shows how football teams’ performance and attendance evolve over 2016–2024.
+
+    **Patterns to notice:**
+    - Before 2020, stronger performance generally aligns with higher attendance.
+    - In 2020, attendance collapses across leagues due to COVID-19 restrictions while performance continues to vary.
+    - Later seasons show attendance recovery and a gradual return of the performance–attendance relationship, at different speeds by league.
+
+    Tip: select a team to track its path across seasons and compare its performance/attendance recovery versus peers.
+    """)
 
     # -------------------------
     # Config
@@ -831,10 +808,11 @@ elif page == "⚽ Elo vs Attendance":
             return go.Figure()
 
         # axis ranges (stable across time) - align to (0,0) with a little zoom out
+        # G2: Use full dataset ranges so axes don't rescale across animation
         x_min = 0.0
-        x_max_raw = float(dff["Points"].max())
+        x_max_raw = float(ts[ts["Division"].isin(leagues_sel)]["Points"].max())
         y_min = 0.0
-        y_max_raw = float(dff["Attendance"].max())
+        y_max_raw = float(ts[ts["Division"].isin(leagues_sel)]["Attendance"].max())
 
         x_max = x_max_raw * 1.08
         y_max = y_max_raw * 1.08
@@ -850,6 +828,12 @@ elif page == "⚽ Elo vs Attendance":
             return np.interp(series, [elo_min, elo_max], [14.0, 60.0])
 
         # color map for leagues
+            st.markdown("""
+            This chart shows how often the Elo-predicted favorite fails to win, grouped by favorite strength.
+            Across all strength levels, upset rates are higher in low-attendance matches, especially when the favorite is strong.
+            This suggests that crowd presence stabilizes expected outcomes and reduces unexpected results.
+            """)
+
         palette = px.colors.qualitative.Plotly
         leagues_sorted = sorted(leagues_sel)
         color_map = {lg: palette[i % len(palette)] for i, lg in enumerate(leagues_sorted)}
@@ -883,9 +867,9 @@ elif page == "⚽ Elo vs Attendance":
                             hovertemplate=(
                                 "<b>%{customdata[0]}</b><br>"
                                 "League: " + lg + "<br>"
-                                "Points: %{x:.0f}<br>"
-                                "Attendance: %{y:.0f}<br>"
-                                "Elo (bubble): %{customdata[2]:.1f}<br>"
+                                "Season Points: %{x:.0f}<br>"
+                                "Avg Attendance: %{y:.0f}<br>"
+                                "Elo Rating (bubble size): %{customdata[2]:.1f}<br>"
                                 "Matches: %{customdata[1]}<extra></extra>"
                             ),
                         )
@@ -920,9 +904,9 @@ elif page == "⚽ Elo vs Attendance":
                         hovertemplate=(
                             "<b>%{customdata[0]}</b><br>"
                             "League: " + lg + "<br>"
-                            "Points: %{x:.0f}<br>"
-                            "Attendance: %{y:.0f}<br>"
-                            "Elo (bubble): %{customdata[2]:.1f}<br>"
+                            "Season Points: %{x:.0f}<br>"
+                            "Avg Attendance: %{y:.0f}<br>"
+                            "Elo Rating (bubble size): %{customdata[2]:.1f}<br>"
                             "Matches: %{customdata[1]}<extra></extra>"
                         ),
                     )
@@ -947,9 +931,9 @@ elif page == "⚽ Elo vs Attendance":
                         hovertemplate=(
                             "<b>%{customdata[0]}</b><br>"
                             "League: " + lg + "<br>"
-                            "Points: %{x:.0f}<br>"
-                            "Attendance: %{y:.0f}<br>"
-                            "Elo (bubble): %{customdata[2]:.1f}<br>"
+                            "Season Points: %{x:.0f}<br>"
+                            "Avg Attendance: %{y:.0f}<br>"
+                            "Elo Rating (bubble size): %{customdata[2]:.1f}<br>"
                             "Matches: %{customdata[1]}<extra></extra>"
                         ),
                     )
