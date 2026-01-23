@@ -59,96 +59,122 @@ page = st.sidebar.radio(
 # =========================================================
 if page == "🏠 Home":
     st.title("⚽ Crowd Impact on Football Performance")
-    st.markdown("""
-    ---
-    """)
-    
+
+    st.markdown("---")
+
+    # -------------------------
+    # Top metrics
+    # -------------------------
     col1, col2, col3 = st.columns(3)
-    
     with col1:
         st.metric("📊 Total Matches", f"{len(df):,}")
     with col2:
         st.metric("🏆 Leagues Analyzed", f"{df['Division'].nunique()}")
     with col3:
         st.metric("📅 Seasons Covered", f"{int(df['Season'].min())} – {int(df['Season'].max())}")
-    
+
+    st.markdown("---")
+
+    # -------------------------
+    # Main insight (clear + neutral)
+    # -------------------------
     st.markdown("""
-    ---
-    
-    ## 🎯 Main Insight
-    
-    **Does home crowd really matter?** This dashboard quantifies the effect of stadium attendance on home team performance, 
-    controlling for team strength (Elo rating).
-    
-    ### Key Findings:
-    
+    ## 🎯 Main Question
+
+    **Does attendance strengthen the home advantage?**  
+    This dashboard compares match outcomes under **Low Crowd** vs **High Crowd** conditions and uses **Elo ratings**
+    to separate crowd effects from differences in team strength.
     """)
-    
-    # Quick stats
+
+    # -------------------------
+    # Quick snapshot (defaults)
+    # -------------------------
+    st.markdown("### 📌 Quick Snapshot (default thresholds: Low ≤ 30%, High ≥ 70%)")
+
     ghost_matches = df[df["AttendanceRate"] <= 0.30]
     crowd_matches = df[df["AttendanceRate"] >= 0.70]
-    
+
     if not ghost_matches.empty and not crowd_matches.empty:
         ghost_winpct = 100 * ghost_matches["HomeWin"].mean()
         crowd_winpct = 100 * crowd_matches["HomeWin"].mean()
         effect = crowd_winpct - ghost_winpct
-        
+
         col_k1, col_k2, col_k3 = st.columns(3)
-        
         with col_k1:
-            st.metric("👻 Low Crowd Win %", f"{ghost_winpct:.1f}%")
+            st.metric("👻 Low Crowd Home Win %", f"{ghost_winpct:.1f}%")
         with col_k2:
-            st.metric("🏟️ High Crowd Win %", f"{crowd_winpct:.1f}%")
+            st.metric("🏟️ High Crowd Home Win %", f"{crowd_winpct:.1f}%")
         with col_k3:
-            st.metric("📊 Crowd Effect", f"+{effect:.1f} pp", delta=f"{effect:+.1f} pp")
-    
+            st.metric("📊 Difference", f"{effect:+.1f} pp")
+    else:
+        st.info("Not enough matches under the default thresholds. Try adjusting thresholds in the Analysis / Deep Dive pages.")
+
+    st.markdown("---")
+
+    # -------------------------
+    # What each page answers (mapped to your visuals)
+    # -------------------------
     st.markdown("""
-    ---
-    
-    ## 📋 How to Use This Dashboard
-    
-    1. **📈 Analysis Tab**: View league-wide trends and upset rates by match context
-       - Compare home win percentages in low crowd vs high crowd attendance conditions
-       - See how crowd effect varies by favorite strength
-    
-    2. **🔍 Deep Dive Tab**: Team-level analysis with individual controls
-       - Analyze residual crowd effect after controlling for team strength (Elo)
-       - Highlight specific teams and see their crowd sensitivity
-    
-    3. **⚙️ Customize**: Use sidebar filters to adjust:
-       - Attendance thresholds (what counts as "low crowd" vs "high crowd")
-       - Season range and league selection
-       - Minimum game thresholds for reliability
-    
-    ---
-    
-    ## 💡 Methodology
-    
-    - **Team Strength**: Measured using Elo ratings
-    - **Crowd Classification**: Attendance rate thresholds (customizable)
-    - **Upset Analysis**: Based on Elo-predicted favorites vs actual outcomes
-    - **Filtering**: Minimum games required per category to ensure statistical reliability
-    
-    ---
-    
+    ## 🧭 Where to Start (what each page answers)
+
+    ### 📈 Analysis — League-level patterns
+    - **Home Win % by League (Dumbbell):**  
+      *Is home win % higher with high attendance than with low attendance — and how does it vary by league?*
+    - **Upset / Surprise Rate (Radar):**  
+      *Are “surprise outcomes” more common with low attendance, especially when the favorite is strong?*  
+      *(Surprise = the Elo-predicted favorite fails to win.)*
+    - Uses the crowd-threshold sliders to test how sensitive the effect is to the definition of Low/High crowd.
+
+    ### 🔍 Deep Dive — Team-level sensitivity
+    - **Crowd Effect Beyond Elo (Residual scatter):**  
+      *Which teams over/under-perform in high-crowd periods beyond what Elo changes predict?*
+    - **Team PPG: High vs Low crowd (Diagonal scatter):**  
+      *Do teams earn more home points per game with fans, or without fans?*
+    - Includes filters (seasons, leagues, min games) and team highlighting for focused inspection.
+
+    ### ⚽ Elo vs Attendance — Evolution over time (animated)
+    - **Gapminder-style bubbles:**  
+      *How did attendance and performance move over 2016–2024, including the COVID drop and recovery?*
+    - Tip: choose teams to track their trajectory; press **Play** to activate the animation.
     """)
-    
+
+    st.markdown("---")
+
+    # -------------------------
+    # Key concepts (short + consistent with your charts)
+    # -------------------------
+    st.markdown("""
+    ## 💡 Key Concepts (used across the dashboard)
+
+    - **Attendance rate** = Attendance / Stadium Capacity (used to classify Low vs High crowd matches).
+    - **Home Win %** = percentage of matches where the home team won.
+    - **PPG (Points Per Game)** = average home points (Win=3, Draw=1, Loss=0).
+    - **Elo rating** = a relative team-strength score; higher Elo indicates a stronger team at that time.
+    - **Elo difference (ΔElo)** = Elo(High crowd period) − Elo(Low crowd period) for the same team aggregation.
+    - **Surprise / upset outcome** = the Elo-predicted favorite fails to win (definition shown in the relevant chart).
+    - **Residual crowd effect** = the part of the High-vs-Low performance difference that remains after accounting for ΔElo
+      (i.e., performance “beyond what strength changes predict”).
+    """)
+
+    st.markdown("---")
+
     st.info("""
-    **💬 Interpretation Tip**: 
-    
-    A positive crowd effect means:
-    - Home teams win **more often** with high attendance
-    - This could be due to **psychological boost** or **player motivation**
-    
-    Analyzing "upsets" (when favorites don't win) helps isolate crowd impact from team strength.
+    **Interpretation Tip**
+
+    These results describe **associations** in historical match data.
+    To reduce confusion from strength differences, several views either compare the same team/league under Low vs High crowd
+    or control for strength using Elo-based expectations.
     """)
 
 # =========================================================
 # PAGE: ANALYSIS
 # =========================================================
 elif page == "📈 Analysis":
-    st.title("Crowd Impact Dashboard")
-    st.caption("Analysis of crowd effect on home team performance.")
+    st.title("📈 High-Level Crowd Impact Analysis")
+    st.markdown(
+    "**Comparing home performance under Low Crowd and High Crowd conditions across leagues and contexts**")
+    
+    st.divider()
 
     # -------------------------
     # Sidebar filters (for Analysis page)
@@ -172,25 +198,29 @@ elif page == "📈 Analysis":
     # Dumbbell Plot: Home Win % by League (Low Crowd vs High Crowd)
     # =========================================================
     st.header("Home Win % by League: Low Crowd vs High Crowd")
-    st.markdown("""
-    **How to read this chart:**
-    - Each line connects the same league's performance under Low Crowd (left) vs High Crowd (right)
-    - A shift to the right = stronger home advantage when crowds are present
-    - This visual comparison isolates the crowd effect from team strength
-    """)
+    
+    st.markdown(
+    "<div style='font-size:20px; font-weight:500; color:#CCCCCC;'>"
+    "Is home advantage, measured as win percentage, higher in high-attendance matches than in low-attendance matches, "
+    "and how does this vary by league?"
+    "</div>",
+    unsafe_allow_html=True)
 
     col_l, col_r = st.columns([1, 0.001])
 
     # Filter data for dumbbell plot
     dff = apply_crowd_status(df)
-
-    if not dff.empty:
     
-        st.markdown("""
-        Across all leagues, home teams win more often when stadiums are full, with the largest increases observed in D1, F1, and E0.
-        The consistent rightward shift indicates a systematic crowd effect rather than league-specific noise.
-        """)
-        # Aggregate: Home win % per league × crowd status
+    st.info(f"""
+    **How to read this chart:**
+    - Each row is one league (Division).
+    - Blue dot = Home win % in **Low Crowd** matches (AttendanceRate ≤ {fixed_low_analysis:.0%}).
+    - Orange dot = Home win % in **High Crowd** matches (AttendanceRate ≥ {fixed_high_analysis:.0%}).
+    - The horizontal distance between the dots is the **crowd effect** in percentage points (pp).
+    - Leagues are sorted by effect size (High − Low).
+    """)
+    if not dff.empty:
+            # Aggregate: Home win % per league × crowd status
         league_stats = (
             dff.groupby(["Division", "CrowdStatus"], as_index=False)
                .agg(HomeWinPct=("HomeWin", lambda s: 100.0 * s.mean()),
@@ -211,7 +241,7 @@ elif page == "📈 Analysis":
                 x=[row["Low Crowd"], row["High Crowd"]],
                 y=[row["Division"], row["Division"]],
                 mode="lines",
-                line=dict(width=6, color="rgba(100,100,100,0.3)"),
+                line=dict(width=6, color="rgba(255,255,255,0.75)"),
                 showlegend=False,
                 hoverinfo="skip"
             ))
@@ -251,11 +281,14 @@ elif page == "📈 Analysis":
             height=450,
             margin=dict(l=60, r=40, t=60, b=40),
             legend=dict(orientation="h", yanchor="top", y=1.12, xanchor="right", x=1.0),
-            hovermode="closest"
+            hovermode="closest",
+            xaxis=dict(tickfont=dict(color="white")),
+            yaxis=dict(tickfont=dict(color="white"))
         )
 
         with col_l:
             st.plotly_chart(fig_dumb, use_container_width=True)
+        
 
         st.divider()
 
@@ -263,37 +296,28 @@ elif page == "📈 Analysis":
     # =========================================================
     # A3: Upsets Radar (Low Crowd vs High Crowd)
     # =========================================================
+    st.markdown("## The Expanding Web of Upsets")
+    st.markdown("**Low Crowd vs High Crowd — Surprise rate by favorite strength**")
     st.markdown(
-        """
-        <style>
-        .radar-wrap {
-            background: linear-gradient(180deg, #11141a 0%, #0b0d12 100%);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 18px;
-            padding: 22px 24px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-            margin-bottom: 16px;
-        }
-        .radar-title {
-            font-size: 34px;
-            font-weight: 800;
-            letter-spacing: 0.2px;
-            color: #f1f5f9;
-            margin: 0 0 6px 0;
-        }
-        .radar-subtitle {
-            color: #9aa4b2;
-            font-size: 14.5px;
-            margin: 0 0 6px 0;
-        }
-        </style>
-        <div class="radar-wrap">
-            <div class="radar-title">The Expanding Web of Upsets</div>
-            <div class="radar-subtitle">Low Crowd vs High Crowd — Upset rate by favorite strength</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    "#### *How does crowd presence affect the likelihood of surprising outcomes, "
+    "and does this effect depend on the expected strength gap between teams?*"
     )
+
+    st.markdown(
+    "This visualization examines how often expected match outcomes fail under different crowd conditions.  \n"
+    "Rather than focusing on raw results, it highlights the **surprise effect** — "
+    "situations where the pre-match favorite does not win."
+    )
+
+    st.markdown(
+    "Matches are grouped by the **Elo rating difference** between the home team and the away team, "
+    "capturing different levels of expected dominance:")
+
+    st.markdown(
+    "- **Small Favorite**: Small Elo difference — teams are relatively evenly matched  \n"
+    "- **Strong Favorite**: Moderate Elo difference — a clear but not overwhelming advantage  \n"
+    "- **Huge Favorite**: Large Elo difference — the home team is expected to win comfortably")
+
 
     dff_radar = df.copy()
     dff_radar["CrowdStatus"] = pd.Series(pd.NA, index=dff_radar.index, dtype="string")
@@ -350,7 +374,6 @@ elif page == "📈 Analysis":
 
         fig_radar.update_layout(
             template="plotly_dark",
-            title=dict(text="Upset Rate by Elo Strength and Crowd Presence", x=0.02, y=0.98),
             showlegend=True,
             legend=dict(orientation="h", yanchor="bottom", y=-0.20, xanchor="center", x=0.5),
             margin=dict(l=30, r=30, t=60, b=70),
@@ -363,22 +386,22 @@ elif page == "📈 Analysis":
                     tickvals=[5, 10, 15, 20],
                     ticktext=["5%", "10%", "15%", "20%"],
                     gridcolor="rgba(255,255,255,0.12)",
+                    tickfont=dict(color="white"),
                 ),
-                angularaxis=dict(gridcolor="rgba(255,255,255,0.08)")
+                angularaxis=dict(gridcolor="rgba(255,255,255,0.08)", tickfont=dict(color="white"))
             ),
         )
 
         st.plotly_chart(fig_radar, use_container_width=True)
+        st.caption(
+        "An **upset** is defined as a match where the home favorite does not win.  \n"
+        "Higher values therefore indicate a stronger *surprise effect* relative to expectations.")
 
-        st.markdown("""
-        This radar chart compares upset rates across favorite strength levels under full and empty stadium conditions.
-        Across all categories, upset rates are consistently higher when crowds are absent, with the largest gaps appearing for stronger favorites.
-        The expanding shape under low crowd conditions highlights how crowd absence amplifies match unpredictability.
-        """)
 
-        st.markdown("""
-        **Interpretation**  
-        - Each axis represents favorite strength (EloBin).  
+
+        st.info("""
+        **how to read:**  
+        - Each axis represents favorite strength.  
         - Radius shows upset rate (home favorite loses).  
         - The red vs green areas highlight the crowd absence effect.  
         """)
@@ -388,16 +411,8 @@ elif page == "📈 Analysis":
 # =========================================================
 elif page == "🔍 Deep Dive":
     st.title("🔍 Team-Level Deep Dive Analysis")
-    st.caption("Detailed analysis of crowd effect on individual teams, controlling for Elo strength.")
-    
-    st.info("""
-    **What you're looking at:**
-    - Each point = one team's average performance in Low Crowd vs High Crowd conditions
-    - X-axis = Elo difference between crowd and low crowd conditions (how much stronger the home team faced in crowds)
-    - Y-axis = **Crowd effect beyond Elo (pp)** = actual crowd effect after controlling for opponent strength
-    - Point size = total games analyzed for that team
-    """)
-    
+    st.markdown("Detailed analysis of crowd effect on individual team.")
+        
     st.divider()
     
     # =========================================================
@@ -440,7 +455,11 @@ elif page == "🔍 Deep Dive":
     # =========================================================
     # A1: Residual scatter (control for Elo)
     # =========================================================
-    st.header("Team-Level Analysis: Residual Crowd Effect (controlling for Elo)")
+    st.header("Crowd Impact Beyond Team Strength (Elo)")
+
+    st.markdown(
+    "#### Question: Do teams gain a crowd boost beyond what changes in team strength (Elo) would predict?"
+    )
 
     d1 = add_crowd_status(df_f)
     d1 = d1[d1["CrowdStatus"].isin(["Low Crowd", "High Crowd"])].copy()
@@ -490,17 +509,24 @@ elif page == "🔍 Deep Dive":
         wide["Expected_DeltaWin"] = model.predict(X)
         wide["Residual"] = wide["DeltaWin_pp"] - wide["Expected_DeltaWin"]
 
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Teams included", f"{len(wide)}")
-        c2.metric("Slope (pp per Elo)", f"{model.coef_[0]:.3f}")
-        c3.metric("Intercept", f"{model.intercept_:.3f}")
+        st.markdown("""
+        **Axes**
+        - X-axis shows how team strength (Elo) differed between High and Low Crowd periods
+        - Y-axis shows the residual crowd effect after controlling for opponent strength
+        - Each point represents one team
+        """)
 
         st.markdown("""
-        - **ΔElo (X):** Positive = team was stronger in High Crowd periods; negative = stronger in Low Crowd periods.
-        - **Crowd effect beyond Elo (Y):** Positive = outperformed what Elo predicts when crowds were present; negative = underperformed relative to strength.
-
-        Reading both axes together separates timing/strength shifts from true crowd-driven deviations, surfacing teams that are unusually sensitive—or insensitive—to crowd presence.
+        **How the Y-axis is computed (Crowd effect beyond Elo):**  
+        For each team, we first measure the difference in home win percentage between High Crowd and Low Crowd matches.  
+        We then estimate how much of this difference is *expected* based solely on changes in team strength (ΔElo), using a linear regression.  
+        The Y-axis shows the **residual**: the part of the performance change that remains *after* accounting for Elo — interpreted as a crowd-specific effect.
         """)
+
+
+        st.caption("Reading both axes together separates **strength/timing effects** from **true crowd-driven deviations**, \
+        highlighting teams that are unusually sensitive—or insensitive—to crowd presence.""")
+
 
         # Calculate percentiles for reference lines (D2)
         p90 = wide["Residual"].quantile(0.90)
@@ -551,12 +577,34 @@ elif page == "🔍 Deep Dive":
                 "Games_High Crowd": "Games (High Crowd)",
                 "Games_Low Crowd": "Games (Low Crowd)",
             },
-            title="Crowd Effect beyond Elo (pp) vs ΔElo (teams)"
+            title="Crowd Effect beyond Elo (pp) vs ΔElo (teams)",
+            template="plotly_dark"
         )
         # uniform bubble size for readability
         fig.update_traces(marker=dict(size=12))
         fig.add_hline(y=0)
         fig.add_vline(x=0)
+        
+        fig.update_layout(
+            template="plotly_dark",
+            height=600,
+            xaxis=dict(
+                tickfont=dict(color="white", size=13),
+                title_font=dict(color="white", size=14),
+                showgrid=True,
+                gridcolor="rgba(255,255,255,0.12)",
+                zeroline=False,
+                zerolinecolor="rgba(255,255,255,0.3)",
+            ),
+            yaxis=dict(
+                tickfont=dict(color="white", size=13),
+                title_font=dict(color="white", size=14),
+                showgrid=True,
+                gridcolor="rgba(255,255,255,0.12)",
+                zeroline=False,
+                zerolinecolor="rgba(255,255,255,0.3)",
+            ),
+        )
         
         # highlight selected - dim non-selected and highlight selected
         if len(selected) > 0:
@@ -582,6 +630,14 @@ elif page == "🔍 Deep Dive":
                 fig.add_trace(trace)
 
         st.plotly_chart(fig, width="stretch")
+        st.info("""
+        **Quadrant interpretation:**
+        - **X > 0, Y > 0:** Strong teams with a positive crowd boost  
+        - **X < 0, Y > 0:** Crowd helps despite a weaker period  
+        - **X > 0, Y < 0:** Strength dominates, limited crowd effect  
+        - **X < 0, Y < 0:** Weaker teams with no crowd compensation
+        """)
+
 
         with st.expander("Underlying table"):
             cols = ["Division","HomeTeam","Residual","DeltaWin_pp","DeltaElo","Games_High Crowd","Games_Low Crowd","WinPct_High Crowd","WinPct_Low Crowd"]
@@ -591,20 +647,25 @@ elif page == "🔍 Deep Dive":
                 "DeltaElo": "ΔElo",
             }
             st.dataframe(wide[cols].sort_values("Residual", ascending=False).rename(columns=renamed_cols), width="stretch")
+        
 
         st.divider()
 
         # =========================================================
-        # A2: PPG Low Crowd vs High Crowd (match screenshot)
+        # A2: PPG Low Crowd vs High Crowd
         # =========================================================
-        st.header("Team Performance: Low Crowd vs High Crowd (Points Per Game)")
-        st.caption("Scatter plot comparing each team's average points per game in Low Crowd vs High Crowd conditions. Points above the diagonal indicate a crowd boost.")
+        st.header("Team Points Per Game: Low Crowd vs High Crowd")
+
+        st.markdown("### Do teams earn more points per game when crowds are present?")
 
         st.markdown("""
-        Points above the diagonal earned more PPG with fans; points below performed better in low-crowd games.
-        The overall upward trend shows team strength is broadly consistent, while deviations from the diagonal reveal who gains or loses with crowd presence.
-        All points use a uniform bubble size so comparisons stay clear; hover to see the exact gap between Low vs High Crowd PPG.
+        This scatter plot compares each team's average home points per game (PPG) under high- and low-crowd conditions.
+        The diagonal line (y = x) indicates equal performance across crowd levels.
+        Points below the diagonal earned more PPG with fans present, while points above the diagonal performed better in low-crowd matches.
+        Deviations from the diagonal therefore capture the impact of crowd presence on team performance.
         """)
+
+        
 
         dppg = d1.copy()
         dppg["HomePoints"] = np.select(
@@ -664,8 +725,7 @@ elif page == "🔍 Deep Dive":
                         "Games_High Crowd": "Games (High Crowd)",
                         "Games_Low Crowd": "Games (Low Crowd)",
                         "GapFromDiagonal": "Gap From Diagonal",
-                    },
-                    title="Team PPG: High Crowd vs Low Crowd Attendance",
+                    }
                 )
 
                 # keep uniform bubble size that's easy to read
@@ -676,9 +736,10 @@ elif page == "🔍 Deep Dive":
                         x=[0, max_ppg],
                         y=[0, max_ppg],
                         mode="lines",
-                        line=dict(color="rgba(200,200,200,0.45)", dash="dash"),
+                        line=dict(color="rgba(255,255,255,0.8)", width=3, dash="dash"),
                         showlegend=False,
                         hoverinfo="skip",
+                        name="Equal PPG (x=y)"
                     )
                 )
 
@@ -689,43 +750,64 @@ elif page == "🔍 Deep Dive":
                     legend_title_text="Division",
                     xaxis=dict(
                         title="PPG (High Crowd)",
+                        title_font=dict(color="white"),
                         range=[0, max_ppg],
                         showgrid=True,
                         gridcolor="rgba(255,255,255,0.12)",
                         zeroline=False,
+                        tickfont=dict(color="white"),
                     ),
                     yaxis=dict(
                         title="PPG (Low Crowd)",
+                        title_font=dict(color="white"),
                         range=[0, max_ppg],
                         showgrid=True,
                         gridcolor="rgba(255,255,255,0.12)",
                         zeroline=False,
+                        tickfont=dict(color="white"),
                     ),
                 )
 
                 st.plotly_chart(fig_ppg, use_container_width=True)
+                st.info("""
+    **How to read:**
+    - X-axis: Points Per Game (PPG) in High Crowd matches
+    - Y-axis: Points Per Game (PPG) in Low Crowd matches
+    - Diagonal line: Equal performance (y = x)
+    - Points below diagonal: Better performance with crowds
+    - Points above diagonal: Better performance without crowds
+    """)
+
 
 # =========================================================
 # PAGE: ELO VS ATTENDANCE (Gapminder)
 # =========================================================
 elif page == "⚽ Elo vs Attendance":
     st.title("Elo vs Attendance (Gapminder-style)")
-    st.markdown("""
-    **Bubble size explanation:**
-    - Bubble size encodes each team's average Elo strength (larger = stronger team by Elo rating)
-    - X-axis shows total season points, Y-axis shows average attendance
-    """)
+    st.markdown("""### How do team performance (season points) and crowd size (average attendance) evolve over time?""")
 
     st.markdown("""
     This animated bubble chart shows how football teams’ performance and attendance evolve over 2016–2024.
+    Each bubble represents a **team in a single season (2016–2024)**.
+    - **X-axis:** Total season points (performance)
+    - **Y-axis:** Average match attendance (crowd size)
+    - **Bubble size:** Average Elo rating for that team/season (larger = stronger by Elo)
+    - **Color:** League
+    """)
 
+    st.markdown("""
     **Patterns to notice:**
     - Before 2020, stronger performance generally aligns with higher attendance.
     - In 2020, attendance collapses across leagues due to COVID-19 restrictions while performance continues to vary.
     - Later seasons show attendance recovery and a gradual return of the performance–attendance relationship, at different speeds by league.
-
-    Tip: select a team to track its path across seasons and compare its performance/attendance recovery versus peers.
     """)
+
+    st.info("""
+    Press **Play** to activate the animation and follow how teams move across seasons. \n
+    Tip: select a team to track its path across seasons and compare its performance/attendance recovery versus peers.
+
+    """)
+
 
     # -------------------------
     # Config
@@ -984,20 +1066,20 @@ elif page == "⚽ Elo vs Attendance":
             ),
             font=dict(color="black"),
             xaxis=dict(
-                title=dict(text="Points per season", font=dict(color="black")),
+                title=dict(text="Points per season", font=dict(color="white")),
                 range=[x_min, x_max],
                 showgrid=True,
                 gridcolor="rgba(0,0,0,0.08)",
                 zeroline=False,
-                tickfont=dict(color="black"),
+                tickfont=dict(color="white"),
             ),
             yaxis=dict(
-                title=dict(text="Attendance (avg per match)", font=dict(color="black")),
+                title=dict(text="Attendance (avg per match)", font=dict(color="white")),
                 range=[y_min, y_max],
                 showgrid=True,
                 gridcolor="rgba(0,0,0,0.08)",
                 zeroline=False,
-                tickfont=dict(color="black"),
+                tickfont=dict(color="white"),
             ),
             annotations=[year_watermark_annotation(base_season)],
             updatemenus=[
@@ -1075,7 +1157,9 @@ elif page == "⚽ Elo vs Attendance":
     teams_all = sorted(ts_leagues["Team"].unique().tolist())
 
     st.sidebar.markdown("### Teams (✓)")
-    st.sidebar.caption("ברירת מחדל: כולם מסומנים. כדי להאיר קבוצה, הורד ✓ מכל היתר והשאר רק את מי שרוצים לבדוק.")
+    st.sidebar.caption(
+    "Default: all teams are selected. To highlight a specific team, uncheck all others and keep only the team(s) you want to inspect."
+    )
 
     # ---- Quick actions ----
     col1, col2 = st.sidebar.columns(2)
@@ -1140,3 +1224,11 @@ elif page == "⚽ Elo vs Attendance":
 
     fig = build_gapminder_like_figure(ts, leagues_sel, highlight_teams)
     st.plotly_chart(fig, use_container_width=True)
+
+    st.info("""
+    **Quick cues:**  
+    - **Higher = larger crowds**  
+    - **Right = more points**  
+    - **Bigger bubble = higher Elo (stronger team)**  
+     """)
+
