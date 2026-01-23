@@ -1059,27 +1059,28 @@ elif page == "⚽ Elo vs Attendance":
             margin=dict(l=40, r=20, t=40, b=60),
             legend_title_text="League",
             legend=dict(
-                bgcolor="rgba(255,255,255,0.9)",
-                bordercolor="rgba(0,0,0,0.1)",
-                borderwidth=1,
-                font=dict(color="black")
+                bgcolor="rgba(255,255,255,0.95)",
+                bordercolor="rgba(0,0,0,0.2)",
+                borderwidth=2,
+                font=dict(color="black", size=13),
+                title=dict(font=dict(color="black", size=14))
             ),
             font=dict(color="black"),
             xaxis=dict(
-                title=dict(text="Points per season", font=dict(color="white")),
+                title=dict(text="Points per season", font=dict(color="black")),
                 range=[x_min, x_max],
                 showgrid=True,
                 gridcolor="rgba(0,0,0,0.08)",
                 zeroline=False,
-                tickfont=dict(color="white"),
+                tickfont=dict(color="black"),
             ),
             yaxis=dict(
-                title=dict(text="Attendance (avg per match)", font=dict(color="white")),
+                title=dict(text="Attendance (avg per match)", font=dict(color="black")),
                 range=[y_min, y_max],
                 showgrid=True,
                 gridcolor="rgba(0,0,0,0.08)",
                 zeroline=False,
-                tickfont=dict(color="white"),
+                tickfont=dict(color="black"),
             ),
             annotations=[year_watermark_annotation(base_season)],
             updatemenus=[
@@ -1149,7 +1150,7 @@ elif page == "⚽ Elo vs Attendance":
     leagues_sel = st.sidebar.multiselect(" ", all_leagues, default=default_leagues)
 
     if not leagues_sel:
-        st.warning("בחר לפחות ליגה אחת.")
+        st.warning("select at least one league to display the chart.")
         st.stop()
 
     # ---- Teams list (default: all checked; highlight only when NOT all checked) ----
